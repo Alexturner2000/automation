@@ -33,10 +33,12 @@ def network_device_fetch(device_ip, execute_command):
 
         Args:
             device_ips (list): List of the IP addresses of devicees
+            execite_command (list): List of CLI commands sent to the network device
 
         Returns:
             None
         """
+        
         for device_ip in device_ip:
                 host = device_ip.strip()                        
                 ssh_pre = paramiko.SSHClient()
@@ -45,28 +47,22 @@ def network_device_fetch(device_ip, execute_command):
                 try:
                         ssh_pre.connect(host, username='admin', password='NiceTry')       
                         print("SSH connection established to " + host)
+                        
                         ssh_post = ssh_pre.invoke_shell()
                         print("Interactive SSH session established")
 
-                        #commands to send
+
                         ssh_post.send("enable\n")
-                        ssh_post.send(execute_command)
+                        
+                        for execute_command in execute_command:
+                                ssh_post.send(execute_command)
+                                time.sleep(1000)
 
-                        #set output to the data received
-                        output = ssh_post.recv(100000)
+                        output_coded = ssh_post.recv(100000)
+                        output = output_coded.decode('utf-8')
 
-                        #print output that looks like CLI
-                        output_nice = output.decode('utf-8')
-
-                        #set filename to the variable to where we want it to go - in case I have to reference later
-                        filename = (f'/devicebackupscript/{host}/{host}.config')
-
-                        #opens file and names it "host-timestamp.txt"
-                        with open(filename, 'w+') as fp:
-                                fp.write(output_nice)
-
-                        #append host + SUCCESS to /deviceresult.txt
-                        print(" - SUCCESS\r\n")
+                        with open(f'/devicebackupscript/{host}/{host}.config', 'w+') as fp:
+                                fp.write(output)
 
                 except AuthenticationException:
                         print("Authentication failed, please verify your credentials: %s")
