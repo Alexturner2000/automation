@@ -10,7 +10,7 @@ import socket
 
 time.sleep(1)
 
-def address_fetch():
+def address_file_fetch():
         """
         Reads the ip addresses in the text document and saves them to a list
 
@@ -26,7 +26,23 @@ def address_fetch():
         return device_ip_list
 
 
-def network_device_fetch(device_ip, execute_command):
+def direction_file_fetch():
+        """
+        Reads the directions in the text document and saves them to a list
+
+        Returns:
+                direction_list (list): List of the CLI direction 
+        """
+
+        with open('direction_list.txt', 'r+') as f:
+                direction_list = f.readlines()
+                if not direction_list:
+                        print ("There are no addresses")
+                        return None
+        return direction_list        
+
+
+def network_device_fetch(device_ip, directions):
         """
         Connects to each network device and fetches the configuration
         
@@ -39,60 +55,57 @@ def network_device_fetch(device_ip, execute_command):
             None
         """
         
-        for device_ip in device_ip:
-                host = device_ip.strip()                        
-                ssh_pre = paramiko.SSHClient()
-                ssh_pre.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        host = device_ip.strip()                        
+        ssh_pre = paramiko.SSHClient()
+        ssh_pre.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-                try:
-                        ssh_pre.connect(host, username='admin', password='NiceTry')       
-                        print("SSH connection established to " + host)
-                        
-                        ssh_post = ssh_pre.invoke_shell()
-                        print("Interactive SSH session established")
+        try:
+                ssh_pre.connect(host, username='admin', password='NiceTry')       
+                print("SSH connection established to " + host)
+                
+                ssh_post = ssh_pre.invoke_shell()
+                print("Interactive SSH session established")
 
 
-                        ssh_post.send("enable\n")
-                        
-                        for execute_command in execute_command:
-                                ssh_post.send(execute_command)
-                                time.sleep(1000)
+                ssh_post.send("enable\n")
+                
+                for directions in directions:
+                        ssh_post.send(directions)
+                        time.sleep(1)
 
-                        output_coded = ssh_post.recv(100000)
-                        output = output_coded.decode('utf-8')
+                output_coded = ssh_post.recv(100000)
+                output = output_coded.decode('utf-8')
+                os.makedirs(f'devicebackupscript/{host}', exist_ok=True)
+                with open(f'devicebackupscript/{host}/{host}.config', 'w+') as fp:
+                        fp.write(output)
 
-                        with open(f'/devicebackupscript/{host}/{host}.config', 'w+') as fp:
-                                fp.write(output)
+        except AuthenticationException:
+                print("Authentication failed, please verify your credentials: %s")
 
-                except AuthenticationException:
-                        print("Authentication failed, please verify your credentials: %s")
+        except SSHException as sshException:
+                print("Unable to establish SSH connection: %s" % sshException)
 
-                except SSHException as sshException:
-                        print("Unable to establish SSH connection: %s" % sshException)
+        except socket.error as socketerr:
+                print("Socket error: %s" % socketerr)
 
-                except socket.error as socketerr:
-                        print("Socket error: %s" % socketerr)
-
-                finally:
-                        ssh_pre.close()
+        finally:
+                ssh_pre.close()
 
 
 def main():
         # IP Address retrival
-        device_ip_list = address_fetch()
+        device_ip_list = address_file_fetch()
         if device_ip_list is None:
                 quit("No addresses") 
         
-        execute_command = ("show run\n")
-        network_device_fetch(device_ip_list, execute_command)
+        # BROKEN directions_list = direction_file_fetch()
+        
+        for device_ip_list in device_ip_list:
+                network_device_fetch(device_ip_list, directions_list)
              
 
 if __name__ == "__main__":
     main()
-
-
-
-
 
 
 # Backup 
